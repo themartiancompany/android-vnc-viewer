@@ -41,20 +41,6 @@ _global_variables() {
   quiet=""
 }
 
-_stop() {
-  local \
-    _app="${2}"
-    _cmd=()
-  # _cmd=(
-  #   "mv"
-  #   "${_device}"
-  #   "${_device}.disabled"
-  # )
-  # su \
-  #   -c \
-  #   "${_cmd[*]}"
-}
-
 _start() {
   local \
     _duration="${1}" \
@@ -104,16 +90,29 @@ _status() {
 _activity_check() {
   local
     _current_activity="${1}"
-  if [[ "${_current_activity}" != "${_app}/${_app}.MainActivity" ]]; then
-    _msg_info \
-      "Current activity: ${_current_activity}"
-    _msg_info \
-      "Target activity: ${_app}/${_app}.MainActivity"
-    activity-launch \
-      "${_camera_app_opts[@]}" \
-      "${_app}" \
-      "MainActivity" || \
-      true
+  if \
+    [[ "${_current_activity}" != "${_app}/"* ]]; then
+      _msg_info \
+        "Current activity: ${_current_activity}"
+      _msg_info \
+        "Target activity: ${_app}/${_app}.ui.MainMenuActivity"
+      activity-launch \
+        "${_viewer_app_opts[@]}" \
+        "${_app}" \
+        "ui.MainMenuActivity" || \
+        true
+  else
+    if [[ "${_current_activity}" != "${_app}/${_app}.ui.VncCanvasActivity" ]]; then
+      _msg_info \
+        "Current activity: ${_current_activity}"
+      _msg_info \
+        "Target activity: ${_app}/${_app}.ui.VncCanvasActivity"
+      activity-launch \
+        "${_viewer_app_opts[@]}" \
+        "${_app}" \
+        "ui.VncCanvasActivity" || \
+        true
+    fi
   fi
 } 
 
@@ -149,7 +148,7 @@ _service() {
     _touch_disabled="${5}"
     _bbrightnessctl_opts=() \
     _touchctl_opts=() \
-    _camera_app_opts=() \
+    _viewer_app_opts=() \
     _touchctl_opts=() \
     _time=0 \
     _current_brightness \
@@ -167,7 +166,7 @@ _service() {
     _touchctl_opts+=(
       -v
     )
-    _camera_app_opts+=(
+    _viewer_app_opts+=(
       -v
     )
   fi
@@ -220,7 +219,7 @@ _service() {
     "disabled"
 }
 
-_android_camera() {
+_android_vnc_viewer() {
   local \
     _duration="${1}" \
     _app="${2}" \
@@ -255,7 +254,7 @@ _android_camera() {
     "${_opts[*]}"
 }
 
-_camera_app_auto_detect() {
+_viewer_app_auto_detect() {
   local \
     _os
   _os="$( \
@@ -263,7 +262,7 @@ _camera_app_auto_detect() {
       -o)"
   if [[ "${_os}" == 'Android' ]]; then
     echo \
-      'net.sourceforge.opencamera'
+      'com.coboltforge.dontmind.multivnc'
   fi
 }
 
@@ -291,9 +290,9 @@ _set_overrides() {
     "$(( 10 * 60 ))" # 10 minutes
     # "$(( 60 * 60 * 24 ))" # 24 hours
   _set_override \
-    "camera" \
+    "viewer" \
     "app" \
-    "$(_camera_app_auto_detect)"
+    "$(_viewer_app_auto_detect)"
   _set_override \
     "poll" \
     "interval" \
@@ -350,7 +349,7 @@ Usage:
      -l <view_length>     View length in seconds.
 			  Default: $(_get "view" "length")
      -a <viewer_app>      Your Android camera app.
-			  Default: $(_get "camera" "app")
+			  Default: $(_get "viewer" "app")
      -d                   Whether to dim the screen or not.
      -t                   Whether to disable touch or not.
      -p                   Poll interval for brightness and
