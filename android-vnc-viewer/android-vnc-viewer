@@ -43,7 +43,7 @@ _global_variables() {
 
 _start() {
   local \
-    _duration="${1}" \
+    _length="${1}" \
     _poll="${2}" \
     _app="${3}" \
     _cmd=() \
@@ -51,9 +51,11 @@ _start() {
     _conf
   _cmd=(
     _service \
-      "${_duration}" \
+      "${_length}" \
       "${_poll}" \
-      "${_app}"
+      "${_app}" \
+      "${_dim}" \
+      "${_touch_disabled}"
   )
   _conf="$( \
     _get_conf_path)"
@@ -90,6 +92,8 @@ _status() {
 _activity_check() {
   local
     _current_activity="${1}"
+  _msg_info \
+    "$(_get_date_human) checking activity"
   if \
     [[ "${_current_activity}" != "${_app}/"* ]]; then
       _msg_info \
@@ -113,7 +117,8 @@ _activity_check() {
         "ui.VncCanvasActivity" || \
         true
     fi
-  fi
+  fi || \
+    true
 } 
 
 _brightness_check() {
@@ -127,7 +132,7 @@ _brightness_check() {
       get || \
       true)"
   if \
-    (( "1" <= "${_current_brightness}" )); then
+    [ 1 -le "${_current_brightness}"] ; then
     _msg_info \
       "Current brightness: ${_current_brightness}"
     bbrightnessctl \
@@ -141,11 +146,11 @@ _brightness_check() {
 
 _service() {
   local \
-    _duration="${1}" \
+    _length="${1}" \
     _poll="${2}" \
     _app="${3}" \
     _dim="${4}" \
-    _touch_disabled="${5}"
+    _touch_disabled="${5}" \
     _bbrightnessctl_opts=() \
     _touchctl_opts=() \
     _viewer_app_opts=() \
@@ -154,6 +159,8 @@ _service() {
     _conf \
     _touch_status \
     _old_activity
+  _msg_info \
+    "service started"
   _conf="$( \
     _get_conf_path)"
   _old_activity="$( \
@@ -171,7 +178,8 @@ _service() {
   fi
   _touch_status="$( \
     touchctl \
-      status)"
+      status || \
+      true)"
   if [[ "${_touch_status}" == "enabled" ]] && \
      [[ "${_touch_disabled}" == "y" ]]; then
     _msg_info \
@@ -180,9 +188,10 @@ _service() {
       "${_touchctl_opts[@]}" \
       disable || \
     true
-  fi
+  fi || \
+    true
   while \
-    (( "${_time}" < "${_duration}" )); do
+    (( ${_time} < ${_length} )); do
     _current_activity="$( \
       activity-focused)"
     _activity_check \
@@ -220,7 +229,7 @@ _service() {
 
 _android_vnc_viewer() {
   local \
-    _duration="${1}" \
+    _length="${1}" \
     _app="${2}" \
     _poll="${3}" \
     _dim="${4}" \
@@ -242,7 +251,7 @@ _android_vnc_viewer() {
   #       "port")"
   # 'net.sourceforge.opencamera' 'MainActivity'
   _cmd_opts+=(
-    "${_duration}"
+    "${_length}"
     "${_poll}"
     "${_app}"
     "${_dim}"
