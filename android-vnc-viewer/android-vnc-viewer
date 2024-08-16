@@ -34,7 +34,7 @@ _global_variables() {
   view_date=""
   view_length=""
   poll_interval=""
-  camera_app=""
+  viewer_app=""
   display_dim=""
   touch_disabled=""
   color=""
@@ -151,7 +151,6 @@ _service() {
     _viewer_app_opts=() \
     _touchctl_opts=() \
     _time=0 \
-    _current_brightness \
     _conf \
     _touch_status \
     _old_activity
@@ -203,7 +202,7 @@ _service() {
     [[ "${_touch_status}" == "disabled" ]] && \
     [[ "${_touch_disabled}" == "y" ]]; then
     _msg_info \
-      "Enabling touch input"
+      "Re-enabling touch input"
     touchctl \
       "${_touchctl_opts[@]}" \
       enable || \
@@ -215,7 +214,7 @@ _service() {
   #     true
   _write_setting \
     "${_conf}" \
-    "camera_mode" \
+    "viewer_mode" \
     "disabled"
 }
 
