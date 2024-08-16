@@ -132,7 +132,7 @@ _brightness_check() {
       get || \
       true)"
   if \
-    [ 1 -le "${_current_brightness}"] ; then
+    [ 1 -le "${_current_brightness}" ] ; then
     _msg_info \
       "Current brightness: ${_current_brightness}"
     bbrightnessctl \
