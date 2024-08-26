@@ -116,11 +116,28 @@ _android_vnc_viewer() {
     )
   fi
   "_${_viewer_app}_opts"
+  if [[ "${_server_port}" != "" ]]; then
+    _msg=(
+      "opening tunnel from port '${_server_port}'"
+      "on '${_view_target}' to '${_view_port}' locally"
+    )
+    _msg_info \
+      "${_msg[*]}"
+    _view_tunnel \
+      "${_view_target}" \
+      "${_view_port}" \
+      "${_server_port}" \
+      "${_length}"
+  elif [[ "${_server_port}" == "" ]]; then
+    true
+  fi
   "${_viewer_app}-helper" \
     "${_viewer_helper_opts[@]}" \
     "add" \
-    "${_view_target}" || \
-    true
+    "${_view_target}"
+  "${_viewer_app}-helper" \
+    "${_viewer_helper_opts[@]}" \
+    "dump"
   activity-launch \
     "${_activity_launch_opts[@]}" \
     "${_viewer_reverse_name}" \
@@ -130,8 +147,13 @@ _android_vnc_viewer() {
 
 _view_tunnel() {
   local \
-    _dynssh_opts=()
-  if [[ "${_server_port}" != "" ]]; then
+    _target="${1}" \
+    _local_port="${2}" \
+    _remote_port="${3}" \
+    _length="${4}" \
+    _tunnel_opts=() \
+    _dynssh_opts=() \
+    _ssh_opts=()
     if [[ "${quiet}" != "y" ]]; then
       _dynssh_opts+=(
         -v
@@ -139,24 +161,37 @@ _view_tunnel() {
     fi
     _dynssh_opts+=(
       -t
-        "${view_target}"
+        "${_target}"
+    )
+    _tunnel_opts+=(
       -l
-        "${_view_port}"
+        "${_local_port}"
       -r
         "${_remote_port}"
     )
     _run \
-      "tunnel_${_view_target}" \
+      "tunnel_${_target}" \
       "0" \
       "async" \
       dynssh \
-        "${_dynssh_opts[@]}" -- \
-        "${_view_target}" \
+        "${_dynssh_opts[@]}" \
+        "${_tunnel_opts[@]}" -- \
+        "${_target}" \
         "sleep ${_length}" || \
       true
-  elif [[ "${_server_port}" == "" ]]; then
+  _ssh_opts+=(
+    -o BatchMode=yes
+    -o ConnectTimeout=5
+  )
+  _status="$( \
+    dynssh \
+    "${_dynssh_opts[@]}" -- \
+    "${_ssh_opts[@]}" \
+    "${_target}" \
+    echo \
+      ok \
+        2>&1)" || \
     true
-  fi
 }
 
 _viewer_app_auto_detect() {
@@ -249,7 +284,7 @@ _target_opts_auto_detect() {
           "${_credentials}" | \
           tail \
             -n \
-            2)"
+            1)"
       _set_override \
         "server" \
         "port" \
