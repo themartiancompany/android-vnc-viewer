@@ -32,146 +32,76 @@ _requirements() {
 # shellcheck disable=SC2034
 _global_variables() {
   view_date=""
-  viet_target=""
+  view_target=""
   view_address=""
   view_port=""
   view_password=""
   view_length=""
   poll_interval=""
   viewer_app=""
+  server_app=""
   display_dim=""
   touch_disabled=""
   color=""
   quiet=""
 }
 
-_activity_check() {
-  local
-    _current_activity="${1}"
-  _msg_info \
-    "$(_get_date_human) checking activity"
-  if \
-    [[ "${_current_activity}" != "${_app}/"* ]]; then
-      _msg_info \
-        "Current activity: ${_current_activity}"
-      _msg_info \
-        "Target activity: ${_app}/${_app}.ui.MainMenuActivity"
-      activity-launch \
-        "${_viewer_app_opts[@]}" \
-        "${_app}" \
-        "ui.MainMenuActivity" || \
-        true
-  else
-    if [[ "${_current_activity}" != "${_app}/${_app}.ui.VncCanvasActivity" ]]; then
-      _msg_info \
-        "Current activity: ${_current_activity}"
-      _msg_info \
-        "Target activity: ${_app}/${_app}.ui.VncCanvasActivity"
-      activity-launch \
-        "${_viewer_app_opts[@]}" \
-        "${_app}" \
-        "ui.VncCanvasActivity" || \
-        true
-    fi
-  fi || \
-    true
-} 
+# _activity_check() {
+#   local
+#     _current_activity="${1}"
+#   _msg_info \
+#     "$(_get_date_human) checking activity"
+#   if \
+#     [[ "${_current_activity}" != "${_app}/"* ]]; then
+#       _msg_info \
+#         "Current activity: ${_current_activity}"
+#       _msg_info \
+#         "Target activity: ${_app}/${_app}.ui.MainMenuActivity"
+#       activity-launch \
+#         "${_viewer_app_opts[@]}" \
+#         "${_app}" \
+#         "ui.MainMenuActivity" || \
+#         true
+#   else
+#     if [[ "${_current_activity}" != "${_app}/${_app}.ui.VncCanvasActivity" ]]; then
+#       _msg_info \
+#         "Current activity: ${_current_activity}"
+#       _msg_info \
+#         "Target activity: ${_app}/${_app}.ui.VncCanvasActivity"
+#       activity-launch \
+#         "${_viewer_app_opts[@]}" \
+#         "${_app}" \
+#         "ui.VncCanvasActivity" || \
+#         true
+#     fi
+#   fi || \
+#     true
+# } 
 
-_service() {
-  local \
-    _length="${1}" \
-    _poll="${2}" \
-    _app="${3}" \
-    _dim="${4}" \
-    _touch_disabled="${5}" \
-    _bbrightnessctl_opts=() \
-    _touchctl_opts=() \
-    _touchctl_opts=() \
-    _time=0 \
-    _conf \
-    _touch_status \
-    _old_activity
-  _msg_info \
-    "service started"
-  _conf="$( \
-    _get_conf_path)"
-  _old_activity="$( \
-    activity-focused)"
-  if [[ "quiet" != "y" ]]; then
-    _bbrightnessctl_opts+=(
-      -v
-    )
-    _touchctl_opts+=(
-      -v
-    )
-    _viewer_app_opts+=(
-      -v
-    )
-  fi
-  _touch_status="$( \
-    touchctl \
-      status || \
-      true)"
-  if [[ "${_touch_status}" == "enabled" ]] && \
-     [[ "${_touch_disabled}" == "y" ]]; then
-    _msg_info \
-      "Disabling touch input"
-    touchctl \
-      "${_touchctl_opts[@]}" \
-      disable || \
-    true
-  fi || \
-    true
-  while \
-    (( ${_time} < ${_length} )); do
-    _current_activity="$( \
-      activity-focused)"
-    _activity_check \
-      "${_current_activity}"
-    if [[ "${_dim}" == "y" ]]; then
-      _brightness_check
-    fi
-    sleep \
-      "${_poll}"
-    _time="$(( \
-      _time + _poll ))"
-  done
-  _touch_status="$( \
-    touchctl \
-      status)"
-  if \
-    [[ "${_touch_status}" == "disabled" ]] && \
-    [[ "${_touch_disabled}" == "y" ]]; then
-    _msg_info \
-      "Re-enabling touch input"
-    touchctl \
-      "${_touchctl_opts[@]}" \
-      enable || \
-    true
-  fi
-  # activity-launch \
-  #   "${_old_activity}" \
-  #   "${_old_activity}" || \
-  #     true
-  _write_setting \
-    "${_conf}" \
-    "viewer_mode" \
-    "disabled"
+_droidvnc_opts() {
+  _viewer_reverse_name='com.coboltforge.dontmind.multivnc'
 }
 
 _android_vnc_viewer() {
   local \
-    _length="${1}" \
-    _app="${2}" \
-    _poll="${3}" \
-    _dim="${4}" \
-    _touch_disabled="${5}" \
+    _view_target="${1}" \
+    _view_address="${2}" \
+    _view_port="${3}" \
+    _view_password="${4}" \
+    _length="${5}" \
+    _viewer_app="${6}" \
+    _server_app="${7}" \
+    _poll="${8}" \
+    _dim="${9}" \
+    _touch_disabled="${10}" \
     _cmd_opts=() \
     _opts=() \
+    _viewer_reverse_name \
     _activity_launch_opts=() \
+    _viewer_helper_opts=() \
     _conf
   shift \
-    5
+    10
   _opts=(
     "$@"
   )
@@ -181,6 +111,9 @@ _android_vnc_viewer() {
     _activity_launch_opts+=(
       -v
     )
+    _viewer_helper_opts+=(
+      -v
+    )
   fi
   # _a="$( \
   #     _read_settings \
@@ -188,22 +121,32 @@ _android_vnc_viewer() {
   #       "${_host}" \
   #       "port")"
   # 'net.sourceforge.opencamera' 'MainActivity'
-  _cmd_opts+=(
-    "${_length}"
-    "${_poll}"
-    "${_app}"
-    "${_dim}"
-    "${_touch_disabled}"
+  _activity_launch_opts+=(
+    -L
+      "${_length}"
   )
+  if [[ "${_dim}" == "y" ]]; then
+    _activity_launch_opts+=(
+      -d
+      -p
+        "${_poll}"
+    )
+  fi
+  if [[ "${_touch_disabled}" == "y" ]]; then
+    _activity_launch_opts+=(
+      -t
+    )
+  fi
+  "_${_viewer_app}_opts"
+  "${_viewer_app}-helper" \
+    "${_viewer_helper_opts[@]}"
+    "add" \
+    "${_view_target}"
   activity-launch \
     "${_activity_launch_opts[@]}" \
-    "${_app}" \
-    "ui.MainMenuActivity" || \
+    "${_viewer_reverse_name}" \
+    "ui.VncCanvasActivity" || \
     true
-
-  "_service" \
-    "${_cmd_opts[@]}" \
-    "${_opts[*]}"
 }
 
 _viewer_app_auto_detect() {
@@ -214,7 +157,7 @@ _viewer_app_auto_detect() {
       -o)"
   if [[ "${_os}" == 'Android' ]]; then
     echo \
-      'com.coboltforge.dontmind.multivnc'
+      'multivnc'
   fi
 }
 
@@ -245,33 +188,64 @@ _get_conf_path() {
 
 _target_opts_auto_detect() {
   local \
-    _dynssh_opts=()
+    _cmd=() \
+    _dynssh_opts=() \
+    _credentials \
+    _port \
+    _password
   # if [[ "${quiet}" != "y" ]]; then
   #   _dynssh_opts+=(
   #     -v
   #   )
   # fi
   if [[ "${view_target}" != "" ]]; then
+    _msg=(
+      "getting credentials from"
+      "target '${view_target}' server"
+      "and server '${server_app}'" 
+    )
+    _msg_info \
+       "${_msg[*]}'"
     _dynssh_opts+=(
       -t
-        "${_view_target}"
+        "${view_target}"
     )
-    dynssh \
-      "${_dynssh_opts[@]}" -- \
-      "${view_target}" \
-      "droidvnc-helpen"
-    _set_override \
-      "view" \
-      "address" \
-      ""
-    _set_override \
-      "view" \
-      "port" \
-      ""
-    _set_override \
-      "view" \
-      "password" \
-      ""
+    _cmd=(
+      "${server_app}-helper"
+        "get"
+        "server_last_port" "&&"
+      "${server_app}-helper"
+        "get"
+        "server_last_password"
+    )
+    _credentials="$( \
+      dynssh \
+        "${_dynssh_opts[@]}" -- \
+        "${view_target}" \
+        "${_cmd[*]}")"
+    if [[ "${_credentials}" != "" ]]; then
+      _port="$( \
+        echo \
+          "${_credentials}" | \
+          awk \
+            '{print $1}')"
+      _password="$( \
+        echo \
+          "${_credentials}" | \
+          awk \
+            '{print $2}')"
+      _set_override \
+        "view" \
+        "port" \
+        "${_port}"
+      _set_override \
+        "view" \
+        "password" \
+        "${_password}"
+    elif [[ "${_credentials}" != "" ]]; then
+      _msg_warning \
+        "unable to get credentials from view target"
+    fi
   fi
 }
 
@@ -287,21 +261,15 @@ _set_overrides() {
   _set_override \
     "view" \
     "address" \
-    ""
+    "localhost"
   _set_override \
     "view" \
     "port" \
-    ""
+    "59001"
   _set_override \
     "view" \
     "password" \
     ""
-  _target_opts_auto_detect
-  _set_override \
-    "view" \
-    "length" \
-    "$(( 10 * 60 ))" # 10 minutes
-    # "$(( 60 * 60 * 24 ))" # 24 hours
   _set_override \
     "viewer" \
     "app" \
@@ -310,6 +278,12 @@ _set_overrides() {
     "server" \
     "app" \
     "$(_server_app_auto_detect)"
+  _target_opts_auto_detect
+  _set_override \
+    "view" \
+    "length" \
+    "$(( 10 * 60 ))" # 10 minutes
+    # "$(( 60 * 60 * 24 ))" # 24 hours
   _set_override \
     "poll" \
     "interval" \
@@ -341,7 +315,7 @@ _show_config() {
   _msg_info "              View target:   $(_get "view" "target")"
   _msg_info "             View address:   $(_get "view" "address")"
   _msg_info "                View port:   $(_get "view" "port")"
-  _msg_info "            View password:   $(_get "view" "password" != "" && echo "****")"
+  _msg_info "            View password:   $([[ "$(_get "view" "password")" != "" ]] && echo "****")"
   _msg_info "              View length:   $(_get "view" "length")"
   _msg_info "            Poll interval:   $(_get "poll" "interval")"
   _msg_info "               Viewer app:   $(_get "viewer" "app")"
@@ -415,7 +389,7 @@ while \
     k) override_view_password="${OPTARG}" ;;
     L) override_view_length="${OPTARG}" ;;
     A) override_viewer_app="${OPTARG}" ;;
-    S) override_viewer_server="${OPTARG}" ;;
+    S) override_server_app="${OPTARG}" ;;
     P) override_poll_interval="${OPTARG}" ;;
     d) override_display_dim="y" ;;
     T) override_touch_disabled="y" ;;
