@@ -131,7 +131,7 @@ _android_vnc_viewer() {
 _view_tunnel() {
   local \
     _dynssh_opts=()
-  if [[ "${_server_port}" != ""]]; then
+  if [[ "${_server_port}" != "" ]]; then
     if [[ "${quiet}" != "y" ]]; then
       _dynssh_opts+=(
         -v
@@ -154,7 +154,7 @@ _view_tunnel() {
         "${_view_target}" \
         "sleep ${_length}" || \
       true
-  elif [[ "${_server_port}" == ""]]; then
+  elif [[ "${_server_port}" == "" ]]; then
     true
   fi
 }
