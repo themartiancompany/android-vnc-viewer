@@ -139,6 +139,7 @@ _android_vnc_viewer() {
   "${_viewer_app}-helper" \
     "${_viewer_helper_opts[@]}" \
     "set" \
+    "${_view_target}" \
     "password" \
     "${_view_password}" || \
     true
