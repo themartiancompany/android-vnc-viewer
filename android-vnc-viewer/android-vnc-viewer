@@ -22,16 +22,20 @@ _requirements() {
   if [[ "${_os}" == 'Android' ]]; then
     _check_cmd \
       "activity-launch" \
-      "android-utils"
+      "android-activity-utils"
     _check_cmd \
       "activity-focused" \
-      "android-utils"
+      "android-activity-utils"
   fi
 }
 
 # shellcheck disable=SC2034
 _global_variables() {
   view_date=""
+  viet_target=""
+  view_address=""
+  view_port=""
+  view_password=""
   view_length=""
   poll_interval=""
   viewer_app=""
@@ -39,54 +43,6 @@ _global_variables() {
   touch_disabled=""
   color=""
   quiet=""
-}
-
-_start() {
-  local \
-    _length="${1}" \
-    _poll="${2}" \
-    _app="${3}" \
-    _cmd=() \
-    _set \
-    _conf
-  _cmd=(
-    _service \
-      "${_length}" \
-      "${_poll}" \
-      "${_app}" \
-      "${_dim}" \
-      "${_touch_disabled}"
-  )
-  _conf="$( \
-    _get_conf_path)"
-  _write_setting \
-    "${_conf}" \
-    "camera_mode" \
-    "enabled"
-  _set="$( \
-    _read_setting \
-      "${_conf}" \
-      "camera_mode")"
-  _msg_info \
-    "set 'camera mode' '${_set}' onto ${_conf}"
-  # su \
-  #   -c \
-  #   "${_cmd[*]}"
-  "${_cmd[@]}"
-}
-
-_status() {
-  local \
-    _status \
-    _conf
-  _conf="$( \
-    _get_conf_path)"
-  _status="$( \
-    _read_setting \
-      "${_conf}" \
-      "camera_mode")"
-  echo \
-    "${_status}"
 }
 
 _activity_check() {
@@ -121,29 +77,6 @@ _activity_check() {
     true
 } 
 
-_brightness_check() {
-  local \
-    _current_brightness
-  _current_brightness="$( \
-    bbrightnessctl \
-      "${_bbrightnessctl_opts[@]}" \
-      -m \
-        root \
-      get || \
-      true)"
-  if \
-    [ 1 -le "${_current_brightness}" ] ; then
-    _msg_info \
-      "Current brightness: ${_current_brightness}"
-    bbrightnessctl \
-      -m \
-        root \
-      set \
-        0 || \
-      true
-  fi
-}
-
 _service() {
   local \
     _length="${1}" \
@@ -153,7 +86,6 @@ _service() {
     _touch_disabled="${5}" \
     _bbrightnessctl_opts=() \
     _touchctl_opts=() \
-    _viewer_app_opts=() \
     _touchctl_opts=() \
     _time=0 \
     _conf \
@@ -236,6 +168,7 @@ _android_vnc_viewer() {
     _touch_disabled="${5}" \
     _cmd_opts=() \
     _opts=() \
+    _activity_launch_opts=() \
     _conf
   shift \
     5
@@ -244,6 +177,11 @@ _android_vnc_viewer() {
   )
   _conf="$( \
     _get_conf_path)"
+  if [[ "quiet" != "y" ]]; then
+    _activity_launch_opts+=(
+      -v
+    )
+  fi
   # _a="$( \
   #     _read_settings \
   #       "${_conf}" \
@@ -257,6 +195,12 @@ _android_vnc_viewer() {
     "${_dim}"
     "${_touch_disabled}"
   )
+  activity-launch \
+    "${_activity_launch_opts[@]}" \
+    "${_app}" \
+    "ui.MainMenuActivity" || \
+    true
+
   "_service" \
     "${_cmd_opts[@]}" \
     "${_opts[*]}"
@@ -274,17 +218,61 @@ _viewer_app_auto_detect() {
   fi
 }
 
+_server_app_auto_detect() {
+  local \
+    _os
+  _os="$( \
+    uname \
+      -o)"
+  if [[ "${_os}" == 'Android' ]]; then
+    echo \
+      'droidvnc'
+  fi
+}
+
 _get_conf_path() {
   local \
     _dir \
     _conf
-  _dir="${HOME}/.config/android-camera"
+  _dir="${HOME}/.config/$(_get "app" "name")"
   _conf="${_dir}/$( \
     _get \
       "app" \
       "name").cfg"
   echo \
     "${_conf}"
+}
+
+_target_opts_auto_detect() {
+  local \
+    _dynssh_opts=()
+  # if [[ "${quiet}" != "y" ]]; then
+  #   _dynssh_opts+=(
+  #     -v
+  #   )
+  # fi
+  if [[ "${view_target}" != "" ]]; then
+    _dynssh_opts+=(
+      -t
+        "${_view_target}"
+    )
+    dynssh \
+      "${_dynssh_opts[@]}" -- \
+      "${view_target}" \
+      "droidvnc-helpen"
+    _set_override \
+      "view" \
+      "address" \
+      ""
+    _set_override \
+      "view" \
+      "port" \
+      ""
+    _set_override \
+      "view" \
+      "password" \
+      ""
+  fi
 }
 
 _set_overrides() {
@@ -294,6 +282,23 @@ _set_overrides() {
     "$(_get_date_human)"
   _set_override \
     "view" \
+    "target" \
+    ""
+  _set_override \
+    "view" \
+    "address" \
+    ""
+  _set_override \
+    "view" \
+    "port" \
+    ""
+  _set_override \
+    "view" \
+    "password" \
+    ""
+  _target_opts_auto_detect
+  _set_override \
+    "view" \
     "length" \
     "$(( 10 * 60 ))" # 10 minutes
     # "$(( 60 * 60 * 24 ))" # 24 hours
@@ -301,6 +306,10 @@ _set_overrides() {
     "viewer" \
     "app" \
     "$(_viewer_app_auto_detect)"
+  _set_override \
+    "server" \
+    "app" \
+    "$(_server_app_auto_detect)"
   _set_override \
     "poll" \
     "interval" \
@@ -329,9 +338,14 @@ _set_overrides() {
 _show_config() {
   _msg_info "${app_name} configuration"
   _msg_info "                View date:   $(_get "view" "date")"
+  _msg_info "              View target:   $(_get "view" "target")"
+  _msg_info "             View address:   $(_get "view" "address")"
+  _msg_info "                View port:   $(_get "view" "port")"
+  _msg_info "            View password:   $(_get "view" "password" != "" && echo "****")"
   _msg_info "              View length:   $(_get "view" "length")"
   _msg_info "            Poll interval:   $(_get "poll" "interval")"
   _msg_info "               Viewer app:   $(_get "viewer" "app")"
+  _msg_info "               Server app:   $(_get "server" "app")"
   _msg_info "              Display dim:   $(_get "display" "dim")"
   _msg_info "           Touch disabled:   $(_get "touch" "disabled")"
 }
@@ -348,19 +362,31 @@ _usage() {
       _usage_text << \
         ENDUSAGETEXT || true
 
-Start an android camera for a while.
+Opens a VNC session.
 
 Usage:
   $(_get "app" "name")
     [options]
   options:
-     -l <view_length>     View length in seconds.
+     -t <view_target>     Target host.
+			  Default: $(_get "view" "target")
+     -a <view_address>    Address of the VNC server.
+			  Default: $(_get "view" "address")
+     -P <view_port>       Port of the VNC server.
+			  Default: $(_get "view" "port")
+     -k <view_password>   Password for the VNC server.
+			  Default: $(_get "view" "password")
+     -L <view_length>     View length in seconds.
 			  Default: $(_get "view" "length")
-     -a <viewer_app>      Your Android camera app.
+     -A <viewer_app>      Android VNC viewer app which will be launched.
 			  Default: $(_get "viewer" "app")
+     -S <server_app>      Destination Android VNC server app.
+			  Default: $(_get "server" "app")
      -d                   Whether to dim the screen or not.
-     -t                   Whether to disable touch or not.
-     -p                   Poll interval for brightness and
+			  Default: $(_get "display" "dim")
+     -T                   Whether to disable touch or not.
+			  Default: $(_get "touch" "disabled")
+     -P                   Poll interval for brightness and
                           touch reset in seconds.
 			  Default: $(_get "poll" "interval")
      -h                   This message.
@@ -379,15 +405,20 @@ _global_variables
 # shellcheck disable=SC2034
 while \
   getopts \
-    'L:a:p:dtcvh?' \
+    't:a:p:k:L:A:S:P:dTcvh?' \
     arg; do
   case \
     "${arg}" in
+    t) override_view_target="${OPTARG}" ;;
+    a) override_view_address="${OPTARG}" ;;
+    p) override_view_port="${OPTARG}" ;;
+    k) override_view_password="${OPTARG}" ;;
     L) override_view_length="${OPTARG}" ;;
-    a) override_viewer_app="${OPTARG}" ;;
-    p) override_poll_interval="${OPTARG}" ;;
+    A) override_viewer_app="${OPTARG}" ;;
+    S) override_viewer_server="${OPTARG}" ;;
+    P) override_poll_interval="${OPTARG}" ;;
     d) override_display_dim="y" ;;
-    t) override_touch_disabled="y" ;;
+    T) override_touch_disabled="y" ;;
     c) override_color="y" ;;
     v) override_quiet="n" ;;
     h|?) _set_overrides && \
@@ -413,9 +444,24 @@ _config_user_init \
 app_opts=(
   "$(_get \
        "view" \
+       "target")"
+  "$(_get \
+       "view" \
+       "address")"
+  "$(_get \
+       "view" \
+       "port")"
+  "$(_get \
+       "view" \
+       "password")"
+  "$(_get \
+       "view" \
        "length")"
   "$(_get \
        "viewer" \
+       "app")"
+  "$(_get \
+       "server" \
        "app")"
   "$(_get \
        "poll" \
