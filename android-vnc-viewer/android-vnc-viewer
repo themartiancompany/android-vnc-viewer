@@ -55,7 +55,7 @@ _multivnc_opts() {
     -p
       "${_view_port}"
     -k
-      "hijess"
+      "${_view_password}"
   )
 }
 
@@ -136,13 +136,13 @@ _android_vnc_viewer() {
     "add" \
     "${_view_target}" || \
     true
-  "${_viewer_app}-helper" \
-    "${_viewer_helper_opts[@]}" \
-    "set" \
-    "${_view_target}" \
-    "password" \
-    "${_view_password}" || \
-    true
+  # "${_viewer_app}-helper" \
+  #   "${_viewer_helper_opts[@]}" \
+  #   "set" \
+  #   "${_view_target}" \
+  #   "password" \
+  #   "${_view_password}" || \
+  #   true
   "${_viewer_app}-helper" \
     "dump" || \
     true
